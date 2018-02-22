@@ -235,7 +235,7 @@ Clang – один из компиляторов Си (также есть gcc, 
 Традиционный (а стал он таким с K&R) стартовый пример кода:
 
 ```
-    #include "stdio.h"
+    #include <stdio.h>
 
     int main(void) {
         puts("Hello world");
@@ -265,7 +265,7 @@ Hello world
 многих известных современных языков, так что в плане операторов сюрпризов не будет.
 
 ```
-#include "stdio.h"
+#include <stdio.h>
 
 int main(void) {
     int a = 1;      // 1
@@ -289,7 +289,7 @@ int main(void) {
 Однако, не всё так просто, как кажется!
 
 ```
-#include "stdio.h"
+#include <stdio.h>
 
 int main(void) {
     int a = 1;              // 1
