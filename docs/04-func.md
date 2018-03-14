@@ -358,8 +358,59 @@ void qsort(         // Функция ничего не вернёт
 
 ### Напишем свою функцию высшего порядка
 
+```C
+#include <stdio.h>
+#include <stdlib.h>
 
+void map(
+  void *from,
+  void *to,
+  size_t count,
+  size_t size,
+  void (*modify)(void *, void *)
+) {
+  /**
+   * Адресной арифметики на void-указателях нет.
+   * Поэтому преобразуем в байт-указатели.
+   */
+  char *from_bytes = (char *)from;
+  char *to_bytes = (char *)to;
+
+  for (int i = 0; i < count; ++i) {
+    modify(from_bytes + i * size, to_bytes + i * size);
+  }
+}
+
+void modify_int(void *from, void *to) {
+  int *a = (int *)from;
+  int *b = (int *)to;
+  *b = (*a) * (*a);
+}
+
+int main() {
+  int a[] = {1, 2, 3, 4, 5};
+  int b[5];
+
+  map(a, b, 5, sizeof(int), modify_int);
+
+  for (int i = 0; i < 5; ++i) {
+    printf("%d\n", b[i]);
+  }
+
+  return 0;
+}
+```
+
+### Callback
 
 Часто бывает нужно выполнить какое-то действие после другого (что очевидно :)).
 Что не очевидно – не всегда это можно сделать последовательными вызовами 2-х
-функций.
+функций. Подробнее это мы рассмотрим на практике в следующих темах –
+"обратные вызовы" – частый инструмент API в Си библиотеках.
+
+Чисто технически это не сильно отличается от функций высшего порядка.
+
+## ДЗ
+
+Написать функции filter, reduce - аналоги [функций
+python](https://ru.wikipedia.org/wiki/Функциональное_программирование_на_Python).
