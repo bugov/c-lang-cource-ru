@@ -187,6 +187,72 @@ int main(void) {
 значение во вне. Нам **не нужен** указатель для printf – нам нужно
 получить значение, вывести его – изменять его значение вне функции не нужно.
 
+## Void
+
+void - необычный специфиактор типа. Иногда он имеет смысл "что-то", иногда -
+"ничто".
+
+1. Тип возвращаемого функцией значения:
+   ```C
+    #include <stdio.h>
+    #include <string.h>
+
+    void beautiful_print(char *text) {
+      for (int i = 0; i < strlen(text) + 4; ++i) {
+        printf("*");
+      }
+
+      printf("\n* %s *\n", text);
+
+      for (int i = 0; i < strlen(text) + 4; ++i) {
+        printf("*");
+      }
+
+      printf("\n");
+    }
+
+    int main(void) {
+      beautiful_print("Hello world");
+      return 0;
+    }
+   ```
+2. Декларация функции – указание на то, что функция не имеет параметров:
+    ```C
+     #include <stdio.h>
+
+     int beautiful_read(void) {
+       int digit;
+       printf("Enter a number: ");
+       scanf("%d\n", &digit);
+       return digit;
+     }
+
+     int main(void) {
+        int num = beautiful_read("some param");
+       return 0;
+     }
+    ```
+   Получаем:
+   ```
+   → clang 04-void-def.c
+   04-void-def.c:11:34: error: too many arguments to function call, expected 0, have 1
+          int num = beautiful_read("some param");
+                    ~~~~~~~~~~~~~~ ^~~~~~~~~~~~
+   04-void-def.c:3:6: note: 'beautiful_read' declared here
+       int beautiful_read(void) {
+       ^
+   1 error generated.
+   ```
+   В случае, если не указываем void в декларации функции - только warning:
+   ```
+   → clang 04-void-def.c
+    04-void-def.c:11:46: warning: too many arguments in call to 'beautiful_read'
+            int num = beautiful_read("some param");
+                      ~~~~~~~~~~~~~~             ^
+    1 warning generated.
+   ```
+
+
 ## Колбеки и функции высших порядков
 
 Опять же, в Си нет разграничения данных и кода – код также данные,
@@ -255,7 +321,7 @@ int main () {
 ```C
 void qsort(         // Функция ничего не вернёт
     void *base,     // Указатель на что-либо
-    size_t nitems,  //
+    size_t nitems,  // Беззнаковое целое для "размеров"
     size_t size,
     int (*compar)(const void *, const void *)
 );
@@ -274,5 +340,3 @@ void qsort(         // Функция ничего не вернёт
 Часто бывает нужно выполнить какое-то действие после другого (что очевидно :)).
 Что не очевидно – не всегда это можно сделать последовательными вызовами 2-х
 функций.
-
-## Void
