@@ -116,8 +116,15 @@ struct Point2d {
 typedef struct User {
   unsigned char age;
   unsigned int ip;
-  char *name;
+  char name[16];
 } User;
+
+typedef struct Example {
+  char symbol;
+  short num1;
+  short num2;  // Смотрим содержимое с этим полем и без него
+  int some_int;
+} Example;
 
 void print_hex(void *a, int size) {
   char *byte = (char *)a;
@@ -140,8 +147,13 @@ int main() {
   User u = { .name = "Ivanov Ivan", .age = 21, .ip = 0x7f000001 };
   // Упс
   printf("User size: %lu (21 expected)\n", sizeof(u));
-  memcpy(buf, &a, sizeof(u));
+  memcpy(buf, &u, sizeof(u));
   print_hex(buf, sizeof(u));
+
+  Example e1 = { 'a', 1, 2, -1 };
+  printf("Example size: %lu\n", sizeof(e1));
+  memcpy(buf, &e1, sizeof(e1));
+  print_hex(buf, sizeof(e1));
 }
 ```
 
@@ -149,18 +161,122 @@ int main() {
 к байтам:
 
 ```
-01 00 00 00  // ?
-ff ff ff ff  // ?
 15 00 00 00  // age
 01 00 00 7f  // ip
-4a 6f 65 00 00 00 00 00  // указатель на name
+49 76 61 6e 6f 76 20 49 76 61 6e 00 00 00 00 00  // name
 ```
+
+Результаты с 2 short:
+
+```
+61
+00     // ?
+01 00
+02 00
+00 00  // ?
+ff ff ff ff
+```
+
+С 1 short:
+
+```
+61
+00     // ?
+01 00
+ff ff ff ff
+```
+
+Можно заметить, что 1-байтовые поля не выравниваются, 2-байтовые — выравниваются
+на чётные позиции, 4-байтовые — на позиции кратные четырём. Понятнее
+"листинг" с примером 2-х short полей можно записать так:
+
+```
+00: 61
+01: 00     // ?
+02: 01 00
+04: 02 00
+06: 00 00  // ?
+08: ff ff ff ff
+```
+
+– где числа до ":" – отсутп в байтах от начала структуры. Именно по этому
+отсутпу и выравниваются поля структуры.
+
+**Самообучение**: разобраться с выравниванием в структуре User.
+
+TODO: Дописать объяснение с картинами причин выравнивания, какая оптимизация идёт.
 
 ## Enum - перечисляемый тип данных
 
 Enumerated тип данных мы могли уже видеть в других языках. Используются они
-для
+для типов, где количество возможных значений ограничено. Например:
+
+```C
+typedef enum Bool {
+  FALSE,
+  TRUE
+} Bool;
+```
+
+```C
+#include <stdio.h>
+
+char *ErrorNames[] = {
+  "",
+  "Some error",
+  "Another error"
+};
+
+enum Errors {
+  SOME_ERROR = 1,
+  ANOTHER_ERROR
+};
+
+int main() {
+  enum Errors err = ANOTHER_ERROR;
+  printf("Size: %lu\nValue: %lu\n", sizeof(err), err);
+  printf(ErrorNames[err]);
+  return err;
+}
+```
 
 ## Битовые поля
+
+Как понятно из названия, нужны они для доступа для отдельных битов (или набора битов).
+Реализованы они в Си на базе структур:
+
+```
+struct <имя> {
+    <тип> <имя>: <размер>;
+    ...
+}
+```
+
+```C
+#include <stdio.h>
+
+struct SomeData {
+    unsigned a: 1;
+    unsigned b: 2;
+    unsigned c: 4;
+    unsigned d: 1;
+    unsigned e: 32;  // Добавить/убрать для просмотра разницы
+};
+
+int main() {
+  struct SomeData data = { 0, 3, 12, 1, 1234 };
+  printf("%lu\n", sizeof(data));
+  printf("%d\n", data.a);
+  printf("%d\n", data.b);
+  printf("%d\n", data.c);
+  printf("%d\n", data.d);
+  printf("%d\n", data.e);
+  return 0;
+}
+```
+
 ## Union
+
+
+
 ### Упражнение: объединяем структуры TCP и UDP заголовков.
