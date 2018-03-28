@@ -98,9 +98,13 @@ int main() {
 
 ### Выравнивание
 
+И всё же у нас "под капотом" всё те же байты. Поэтому посмотрим, как
+устроены эти самые структуры.
+
 ```C
 #include <stdio.h>
 #include <math.h>
+// Подключаем для memcpy (да, неочевидно, но именно в "строках")
 #include <string.h>
 
 typedef struct Point2d Point2d;
@@ -111,7 +115,8 @@ struct Point2d {
 
 typedef struct User {
   unsigned char age;
-  char name[16];
+  unsigned int ip;
+  char *name;
 } User;
 
 void print_hex(void *a, int size) {
@@ -127,13 +132,28 @@ void print_hex(void *a, int size) {
 int main() {
   char buf[100];
   Point2d a = { .y = -1, .x = 1};
+  // Ожидаемо, 8 байт (по 4 за каждый int)
   printf("Point2d size: %lu\n", sizeof(a));
   memcpy(buf, &a, 8);
   print_hex(buf, 8);
 
-  User u = { .name = "Joe", .age = 21 };
-  printf("User size: %lu (20 expected)\n", sizeof(u));
+  User u = { .name = "Ivanov Ivan", .age = 21, .ip = 0x7f000001 };
+  // Упс
+  printf("User size: %lu (21 expected)\n", sizeof(u));
+  memcpy(buf, &a, sizeof(u));
+  print_hex(buf, sizeof(u));
 }
+```
+
+Получаем 24 вместо 21 байта (если sizeof(int) == 4). Если присмотреться
+к байтам:
+
+```
+01 00 00 00  // ?
+ff ff ff ff  // ?
+15 00 00 00  // age
+01 00 00 7f  // ip
+4a 6f 65 00 00 00 00 00  // указатель на name
 ```
 
 ## Enum - перечисляемый тип данных
