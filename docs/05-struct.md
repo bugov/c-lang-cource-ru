@@ -247,8 +247,8 @@ int main() {
 
 ```
 struct <имя> {
-    <тип> <имя>: <размер>;
-    ...
+  <тип> <имя>: <размер>;
+  ...
 }
 ```
 
@@ -256,11 +256,11 @@ struct <имя> {
 #include <stdio.h>
 
 struct SomeData {
-    unsigned a: 1;
-    unsigned b: 2;
-    unsigned c: 4;
-    unsigned d: 1;
-    unsigned e: 32;  // Добавить/убрать для просмотра разницы
+  unsigned a: 1;
+  unsigned b: 2;
+  unsigned c: 4;
+  unsigned d: 1;
+  unsigned e: 32;  // Добавить/убрать для просмотра разницы
 };
 
 int main() {
@@ -277,6 +277,59 @@ int main() {
 
 ## Union
 
+Объединения в Си похожи на структуры, однако поля, объявленные в них, имеют
+начало на одном и том же адресе. То есть это возможность манипулировать одними
+и теми же данными с помошью разных их представлений.
 
+Например, с float и int:
+
+```C
+#include <stdio.h>
+
+union floatint{
+  float f;
+  int i;
+};
+
+int main() {
+  union floatint u = { 10.f };
+  printf("%f\n", u.f);
+  printf("%x\n", u.i);
+  return 0;
+}
+```
+
+Это довольно занятно, но интереснее делать объединения структур:
+
+```C
+#include <stdio.h>
+
+typedef union Register32 {
+    struct {
+        unsigned char byte1;
+        unsigned char byte2;
+        unsigned char byte3;
+        unsigned char byte4;
+    } bytes;
+    struct {
+        unsigned short low;
+        unsigned short high;
+    } words;
+    unsigned dword;
+} Register32;
+
+int main() {
+    Register32 reg;
+    reg.dword = 0x0000C0FF;
+    printf("    dword \t%08x\n", reg.dword);
+    printf(" low word \t%04x\n", reg.words.low);
+    printf("high word \t%04x\n", reg.words.high);
+    printf("    byte1 \t%02x\n", reg.bytes.byte1);  
+    printf("    byte2 \t%02x\n", reg.bytes.byte2);  
+    printf("    byte3 \t%02x\n", reg.bytes.byte3);  
+    printf("    byte4 \t%02x\n", reg.bytes.byte4);  
+    return 0;
+}
+```
 
 ### Упражнение: объединяем структуры TCP и UDP заголовков.
