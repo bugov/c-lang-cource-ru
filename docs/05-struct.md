@@ -54,11 +54,11 @@ int main() {
   Point2d point = { .y = -1, .x = 1};  // Ещё один способ инициализации
   print_point(point);
 
-  Point2d point2 = point;
+  Point2d point2 = point;  // Копирование
   point2.y = 255;
   print_point(point);
 
-  Point2d *point3 = &point;
+  Point2d *point3 = &point;  //*
   point3->x = 343;  // Разыменование - очередной синтаксический сахар
   print_point(point);
 }
@@ -71,7 +71,7 @@ int main() {
 typedef unsigned long size_t;
 ```
 
-### Упражнение: считаем расстояние между точками.
+### Упражнение: считаем расстояние между точками
 
 ```C
 #include <stdio.h>
@@ -96,7 +96,51 @@ int main() {
 }
 ```
 
-## Enum - перечисляемый тип данных.
+### Выравнивание
+
+```C
+#include <stdio.h>
+#include <math.h>
+#include <string.h>
+
+typedef struct Point2d Point2d;
+struct Point2d {
+  int x;
+  int y;
+};
+
+typedef struct User {
+  unsigned char age;
+  char name[16];
+} User;
+
+void print_hex(void *a, int size) {
+  char *byte = (char *)a;
+
+  for (int i = 0; i < size; ++i) {
+    printf("%02hhx ", *(byte + i));
+  }
+
+  printf("\n");
+}
+
+int main() {
+  char buf[100];
+  Point2d a = { .y = -1, .x = 1};
+  printf("Point2d size: %lu\n", sizeof(a));
+  memcpy(buf, &a, 8);
+  print_hex(buf, 8);
+
+  User u = { .name = "Joe", .age = 21 };
+  printf("User size: %lu (20 expected)\n", sizeof(u));
+}
+```
+
+## Enum - перечисляемый тип данных
+
+Enumerated тип данных мы могли уже видеть в других языках. Используются они
+для
+
 ## Битовые поля
 ## Union
 ### Упражнение: объединяем структуры TCP и UDP заголовков.
