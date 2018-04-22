@@ -113,6 +113,7 @@ __header_always_inline int __sputc(int _c, FILE *_p) {
 			__swbuf((int)(c), p) : \
 		(*(p)->_p = (c), (int)*(p)->_p++))
 #endif
+//__
 ```
 
 Ну и конец – ставим комменты о том, что закрываем, ибо можно запутаться:
@@ -120,3 +121,91 @@ __header_always_inline int __sputc(int _c, FILE *_p) {
 ```C
 #endif /* _STDIO_H_ */
 ```
+
+# Сделаем свою небольшую библиотеку
+
+Вспомним связный список, который мы реализовали в теме про динамическую память.
+
+Для начала определим "правила игры" / "контракт" нашей библиотеки в
+заголовочном файле `linked_list.h`
+
+```C
+#ifndef	_LINKED_LIST_H_
+#define	_LINKED_LIST_H_
+
+#include <stdio.h>
+
+typedef struct node {
+  struct node * next;
+  char val;
+} node_t;
+
+void print_list(node_t *head);
+void add(node_t * head, char val);
+
+#endif /* _LINKED_LIST_H_ */
+```
+
+Ну и сам код, "реализация контракта" `linked_list.c`:
+
+```C
+#include "linked_list.h"
+#include <stdlib.h>
+
+void print_list(node_t *head) {
+  node_t * current = head;
+
+  while (current != NULL) {
+    printf("%c->", current->val);
+    current = current->next;
+  }
+
+  printf("\n");
+}
+
+void add(node_t * head, char val) {
+  node_t * current = head;
+  while (current->next != NULL) {
+    current = current->next;
+  }
+
+  current->next = (node_t * )malloc(sizeof(node_t));
+  current->next->val = val;
+  current->next->next = NULL;
+}
+```
+
+И `main.c`, который будет использовать нашу библиотеку:
+
+```C
+#include "linked_list.h"
+
+int main() {
+  char c;
+  node_t head = { .next = NULL, .val = ' ' };
+
+  while ((c = getc(stdin)) != EOF) {
+    add(&head, c);
+  }
+
+  print_list(&head);
+}
+```
+
+Ну и начинаем собирать. Сначала объекты нашей библиотеки и основного файла:
+
+```
+→ clang -c linked_list.c -o linked_list.o
+→ clang -c main.c -o main.o
+```
+
+В сущности, именно сейчас и происходит "компиляция". Компилятор берет файлы
+с исходным кодом и получает из них объектные файлы.
+
+Далее, собираем их в программу:
+
+```
+→ clang linked_list.o main.o -o linked_list_example
+```
+
+Линковщик берет объектные файлы и получает из них исполняемый файл. Сборка = компиляция + линковка.
