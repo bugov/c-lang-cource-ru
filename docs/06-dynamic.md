@@ -233,7 +233,7 @@ int main() {
     add(&head, c);
   }
 
-  print_list(&node);
+  print_list(&head);
 }
 ```
 
