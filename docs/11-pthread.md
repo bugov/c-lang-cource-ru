@@ -1,5 +1,57 @@
 # Многопоточность в Linux и Си
 
+TODO расписать подробнее, пока тезисы
+
+Конкуретность в Linux:
+- процессы (fork, IPC, etc)
+- треды (потоки, нити)
+- асинхронная работа (мультиплексирование)
+
+- Реинтерабельность
+- thread safe
+
+Проблема общих переменных в многопотосных приложениях:
+
+```C
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#define BIG_NUM 600000
+
+unsigned long a = 0;
+
+static void *calc() {
+  puts("Run calc");
+
+  for(unsigned i = 0; i < BIG_NUM; ++i) {
+    ++a;
+  }
+
+  return NULL;
+}
+
+int main() {
+  pthread_t thread[2];
+
+  pthread_create(&thread[0], NULL, &calc, NULL);
+  pthread_create(&thread[1], NULL, &calc, NULL);
+
+  // wait threads
+  pthread_join(thread[0], NULL);
+  printf("Joining 1: %lu\n", a);
+
+  pthread_join(thread[1], NULL);
+  printf("Joining 2: %lu\n", a);
+
+  return 0;
+}
+```
+
+
+Пример многопоточного эхо-сервера:
+
+
 ```C
 #include <stdlib.h>
 #include <stdio.h>
@@ -85,6 +137,7 @@ stop_serving:
 
   /**
    * Тред ничего не считал, вернуть ничего не хочет.
+   * Иначе мы бы использовали int pthread_join(thread_t tid, void ** status);
    */
   return NULL;
 }
