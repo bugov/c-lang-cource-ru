@@ -10,46 +10,220 @@ TODO расписать подробнее, пока тезисы
 - Реинтерабельность
 - thread safe
 
-Проблема общих переменных в многопотосных приложениях:
+Проблема общих переменных в многопоточных приложениях:
 
 ```C
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#define BIG_NUM 600000
+#define BIG_NUM 60000
 
-unsigned long a = 0;
+int a = 0;
 
-static void *calc() {
-  puts("Run calc");
-
+static void *plus() {
   for(unsigned i = 0; i < BIG_NUM; ++i) {
     ++a;
   }
+  return NULL;
+}
 
+static void *minus() {
+  for(unsigned i = 0; i < BIG_NUM; ++i) {
+    --a;
+  }
   return NULL;
 }
 
 int main() {
   pthread_t thread[2];
 
-  pthread_create(&thread[0], NULL, &calc, NULL);
-  pthread_create(&thread[1], NULL, &calc, NULL);
+  pthread_create(&thread[0], NULL, &plus, NULL);
+  pthread_create(&thread[1], NULL, &minus, NULL);
 
   // wait threads
   pthread_join(thread[0], NULL);
-  printf("Joining 1: %lu\n", a);
-
   pthread_join(thread[1], NULL);
-  printf("Joining 2: %lu\n", a);
+
+  printf("Result: %d\n", a);
 
   return 0;
 }
 ```
 
+## Мьютексы
 
-Пример многопоточного эхо-сервера:
+Итак, проблему мы обозначили, теперь давайте её решать. В общем смысле
+нам нужно синхронизировать доступ к общим данным. Один из вариантов –
+мьютексы.
+
+### Упражнение: пример использования мьютекса
+
+```C
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#define BIG_NUM 60000
+
+int a = 0;
+pthread_mutex_t mutex;
+
+static void *plus() {
+  for(unsigned i = 0; i < BIG_NUM; ++i) {
+    pthread_mutex_lock(&mutex);
+    ++a;
+    pthread_mutex_unlock(&mutex);
+  }
+  return NULL;
+}
+
+static void *minus() {
+  for(unsigned i = 0; i < BIG_NUM; ++i) {
+    pthread_mutex_lock(&mutex);
+    --a;
+    pthread_mutex_unlock(&mutex);
+  }
+  return NULL;
+}
+
+int main() {
+  pthread_t thread[2];
+  pthread_mutex_init(&mutex, NULL);
+
+  pthread_create(&thread[0], NULL, &plus, NULL);
+  pthread_create(&thread[1], NULL, &minus, NULL);
+
+  // wait threads
+  pthread_join(thread[0], NULL);
+  pthread_join(thread[1], NULL);
+
+  printf("Result: %d\n", a);
+  pthread_mutex_destroy(&mutex);
+
+  return 0;
+}
+```
+
+## Семафоры
+
+Если мьютексы могут находиться в 2-х состояниях (занят/совбоден), то
+семафоры – мьютексы "на стероидах" – состояний может быть больше.
+Разберёмся, в чём отличие.
+
+```
+int sem_init(sem_t *sem, int pshared, unsigned int value);
+```
+
+pshared – флаг,указывающий, должен ли семафор быть расшарен при использовании функции fork(), value – начальное значение семафора.
+
+Далее, для ожидания доступа используется функция
+
+```
+int sem_wait(sem_t *sem);
+```
+
+Если значение семафора отрицательное, то вызывающий поток блокируется до тех пор, пока один из потоков не вызовет sem_post
+
+```
+int sem_post(sem_t *sem);
+```
+
+Эта функция увеличивает значение семафора и разблокирует ожидающие потоки. Как обычно, в конце необходимо уничтожить семафор
+
+```
+int sem_destroy(sem_t *sem);
+```
+
+Кроме того, можно получить текущее значение семаформа
+
+```
+int sem_getvalue(sem_t *sem, int *valp);
+```
+
+### Упражнение: пример использования семафора
+
+TODO: придумать вменяемый практичный пример
+
+## Спинлоки
+
+Как и мьютексы, но ожидающие треды не "засыпают" и не складываются в очередь.
+Вместо этого они с завидным упорством пытаются захватить поток управления.
+
+```
+int pthread_spin_init(pthread_spinlock_t *lock, int pshared);
+```
+
+Первый аргумент - указатель на переменную спинлок, второй аргумент указывает:
+может ли спинлок использоваться потоками, принадлежащими разным процессам (shared mem).
+
+```
+int pthread_spin_destroy(pthread_spinlock_t *lock);
+```
+
+Блокировка потока спинлоком осуществляется с помощью функции
+
+```
+int pthread_spin_lock(pthread_spinlock_t *lock);
+```
+
+```
+int pthread_spin_trylock(pthread_spinlock_t *lock);
+```
+
+### Упражнение: пример использования спинлока
+
+```C
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#define BIG_NUM 60000
+
+int a = 0;
+pthread_spinlock_t lock;
+
+static void *plus() {
+  for(unsigned i = 0; i < BIG_NUM; ++i) {
+    pthread_spin_lock(&lock);
+    ++a;
+    pthread_spin_unlock(&lock);
+  }
+  return NULL;
+}
+
+static void *minus() {
+  for(unsigned i = 0; i < BIG_NUM; ++i) {
+    pthread_spin_lock(&lock);
+    --a;
+    pthread_spin_unlock(&lock);
+  }
+  return NULL;
+}
+
+int main() {
+  pthread_t thread[2];
+  pthread_spin_init(&lock, 0);
+
+  pthread_create(&thread[0], NULL, &plus, NULL);
+  pthread_create(&thread[1], NULL, &minus, NULL);
+
+  // wait threads
+  pthread_join(thread[0], NULL);
+  pthread_join(thread[1], NULL);
+
+  printf("Result: %d\n", a);
+  pthread_spin_destroy(&lock);
+
+  return 0;
+}
+```
+
+```
+clang -lpthread spin.c
+```
+
+## Пример многопоточного эхо-сервера
 
 
 ```C
