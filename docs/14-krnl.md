@@ -74,179 +74,100 @@ sudo rmmod mod
 sudo dmesg
 ```
 
-## Пишем своё псевдо-устройство
+## Пишем свой обработчик прерываний
 
 Рассмотрим пример chardev из [гайда по разработке модулей ядра](http://www.tldp.org/LDP/lkmpg/2.6/html/).
 
 ```C
-/*
- *  chardev.c: Creates a read-only char device that says how many times
- *  you've read from the dev file
- */
-
-#include <linux/kernel.h>
 #include <linux/module.h>
-#include <linux/fs.h>
-#include <asm/uaccess.h>	/* for put_user */
+#include "usr/src/linux-headers-4.15.0-20/include/linux/configfs.h"
+#include <linux/init.h>
+#include <linux/tty.h>    /* определение fg_console, MAX_NR_CONSOLES */
+#include <linux/kd.h>     /* определение KDSETLED */
+#include <linux/console_struct.h> /* определение  vc_cons */
+
+MODULE_DESCRIPTION("Пример module illustrating the use of Keyboard LEDs.");
+MODULE_AUTHOR("Daniele Paolo Scarpazza");
+MODULE_LICENSE("GPL");
+
+struct timer_list my_timer;
+struct tty_driver *my_driver;
+char kbledstatus = 0;
+
+#define BLINK_DELAY   HZ/5
+#define ALL_LEDS_ON   0x07
+#define RESTORE_LEDS  0xFF
 
 /*
- *  Prototypes - this would normally go in a .h file
- */
-int init_module(void);
-void cleanup_module(void);
-static int device_open(struct inode *, struct file *);
-static int device_release(struct inode *, struct file *);
-static ssize_t device_read(struct file *, char *, size_t, loff_t *);
-static ssize_t device_write(struct file *, const char *, size_t, loff_t *);
-
-#define SUCCESS 0
-#define DEVICE_NAME "chardev"	/* Dev name as it appears in /proc/devices   */
-#define BUF_LEN 80		/* Max length of the message from the device */
-
-/* 
- * Global variables are declared as static, so are global within the file. 
+ * Функция my_timer_func мигает индикаторами на клавиатуре периодически вызывая 
+ * ioctl() драйвера клавиатуры с командой KDSETLED. Дополнительную информацию,
+ * по командам ioctl виртуального терминала, вы найдете в:
+ *     /usr/src/linux/drivers/char/vt_ioctl.c, function vt_ioctl().
+ *
+ * Дополнительный аргумент команды KDSETLED -- значение 7 (перевод в режим
+ * LED_SHOW_IOCTL -- управление индикаторами через ioctl), значение 0xFF --
+ * (любое значение, большее 7, перевод в режим LED_SHOW_FLAGS --
+ * отображение фактического состояния клавиатуры). Дополнительная информация:
+ *     /usr/src/linux/drivers/char/keyboard.c, function setledstate().
+ * 
  */
 
-static int Major;		/* Major number assigned to our device driver */
-static int Device_Open = 0;	/* Is device open?
-				 * Used to prevent multiple access to device */
-static char msg[BUF_LEN];	/* The msg the device will give when asked */
-static char *msg_Ptr;
-
-static struct file_operations fops = {
-	.read = device_read,
-	.write = device_write,
-	.open = device_open,
-	.release = device_release
-};
-
-/*
- * This function is called when the module is loaded
- */
-int init_module(void)
+static void my_timer_func(unsigned long ptr)
 {
-        Major = register_chrdev(0, DEVICE_NAME, &fops);
+  int *pstatus = (int *)ptr;
 
-	if (Major < 0) {
-	  printk(KERN_ALERT "Registering char device failed with %d\n", Major);
-	  return Major;
-	}
+  if (*pstatus == ALL_LEDS_ON)
+    *pstatus = RESTORE_LEDS;
+  else
+    *pstatus = ALL_LEDS_ON;
 
-	printk(KERN_INFO "I was assigned major number %d. To talk to\n", Major);
-	printk(KERN_INFO "the driver, create a dev file with\n");
-	printk(KERN_INFO "'mknod /dev/%s c %d 0'.\n", DEVICE_NAME, Major);
-	printk(KERN_INFO "Try various minor numbers. Try to cat and echo to\n");
-	printk(KERN_INFO "the device file.\n");
-	printk(KERN_INFO "Remove the device file and module when done.\n");
+  (my_driver->ioctl) (vc_cons[fg_console].d->vc_tty, NULL, KDSETLED,
+          *pstatus);
 
-	return SUCCESS;
+  my_timer.expires = jiffies + BLINK_DELAY;
+  add_timer(&my_timer);
 }
 
-/*
- * This function is called when the module is unloaded
- */
-void cleanup_module(void)
+static int __init kbleds_init(void)
 {
-	/* 
-	 * Unregister the device 
-	 */
-	int ret = unregister_chrdev(Major, DEVICE_NAME);
-	if (ret < 0)
-		printk(KERN_ALERT "Error in unregister_chrdev: %d\n", ret);
+  int i;
+
+  printk(KERN_INFO "kbleds: loading\n");
+  printk(KERN_INFO "kbleds: fgconsole is %x\n", fg_console);
+  for (i = 0; i < MAX_NR_CONSOLES; i++) {
+    if (!vc_cons[i].d)
+      break;
+    printk(KERN_INFO "poet_atkm: console[%i/%i] #%i, tty %lx\n", i,
+           MAX_NR_CONSOLES, vc_cons[i].d->vc_num,
+           (unsigned long)vc_cons[i].d->vc_tty);
+  }
+  printk(KERN_INFO "kbleds: finished scanning consoles\n");
+
+  my_driver = vc_cons[fg_console].d->vc_tty->driver;
+  printk(KERN_INFO "kbleds: tty driver magic %x\n", my_driver->magic);
+
+  /*
+   * Инициировать таймер
+   */
+  init_timer(&my_timer);
+  my_timer.function = my_timer_func;
+  my_timer.data = (unsigned long)&kbledstatus;
+  my_timer.expires = jiffies + BLINK_DELAY;
+  add_timer(&my_timer);
+
+  return 0;
 }
 
-/*
- * Methods
- */
-
-/* 
- * Called when a process tries to open the device file, like
- * "cat /dev/mycharfile"
- */
-static int device_open(struct inode *inode, struct file *file)
+static void __exit kbleds_cleanup(void)
 {
-	static int counter = 0;
-
-	if (Device_Open)
-		return -EBUSY;
-
-	Device_Open++;
-	sprintf(msg, "I already told you %d times Hello world!\n", counter++);
-	msg_Ptr = msg;
-	try_module_get(THIS_MODULE);
-
-	return SUCCESS;
+  printk(KERN_INFO "kbleds: unloading...\n");
+  del_timer(&my_timer);
+  (my_driver->ioctl) (vc_cons[fg_console].d->vc_tty, NULL, KDSETLED,
+          RESTORE_LEDS);
 }
 
-/* 
- * Called when a process closes the device file.
- */
-static int device_release(struct inode *inode, struct file *file)
-{
-	Device_Open--;		/* We're now ready for our next caller */
-
-	/* 
-	 * Decrement the usage count, or else once you opened the file, you'll
-	 * never get get rid of the module. 
-	 */
-	module_put(THIS_MODULE);
-
-	return 0;
-}
-
-/* 
- * Called when a process, which already opened the dev file, attempts to
- * read from it.
- */
-static ssize_t device_read(struct file *filp,	/* see include/linux/fs.h   */
-			   char *buffer,	/* buffer to fill with data */
-			   size_t length,	/* length of the buffer     */
-			   loff_t * offset)
-{
-	/*
-	 * Number of bytes actually written to the buffer 
-	 */
-	int bytes_read = 0;
-
-	/*
-	 * If we're at the end of the message, 
-	 * return 0 signifying end of file 
-	 */
-	if (*msg_Ptr == 0)
-		return 0;
-
-	/* 
-	 * Actually put the data into the buffer 
-	 */
-	while (length && *msg_Ptr) {
-
-		/* 
-		 * The buffer is in the user data segment, not the kernel 
-		 * segment so "*" assignment won't work.  We have to use 
-		 * put_user which copies data from the kernel data segment to
-		 * the user data segment. 
-		 */
-		put_user(*(msg_Ptr++), buffer++);
-
-		length--;
-		bytes_read++;
-	}
-
-	/* 
-	 * Most read functions return the number of bytes put into the buffer
-	 */
-	return bytes_read;
-}
-
-/*
- * Called when a process writes to dev file: echo "hi" > /dev/hello 
- */
-static ssize_t
-device_write(struct file *filp, const char *buff, size_t len, loff_t * off)
-{
-	printk(KERN_ALERT "Sorry, this operation isn't supported.\n");
-	return -EINVAL;
-}
+module_init(kbleds_init);
+module_exit(kbleds_cleanup);
 ```
 
 
