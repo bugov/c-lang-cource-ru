@@ -354,7 +354,7 @@ static PyObject * close_queue_fd(
 
 static PyMethodDef methods[] = {
   { "open_queue_fd", open_queue_fd, METH_VARARGS, "Get nfqueue fd" },
-  { "close_queue_fd", close_queue_fd, METH_VARARGS, "Close nfqueue fd" },
+  { "clos_queue_fd", close_queue_fd, METH_VARARGS, "Close nfqueue fd" },
   { "get_pkt", get_pkt, METH_VARARGS, "Get packet" },
   { NULL, NULL, 0, NULL },
 };
