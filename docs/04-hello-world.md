@@ -86,7 +86,7 @@
 Собираем, запускаем:
 
 ```Bash
-→ clang 01-hello-world.c -o hello_world
+→ clang hello-world.c -o hello_world
 → ./hello_world
 Hello world
 ```
